@@ -6,22 +6,22 @@
 
 // ====================== 正向：链接 → Clash ======================
 export function linkToClash(links: string[]): string {
-  let yaml = "proxies:\n";
+  let yaml = 'proxies:\n';
   for (const link of links) {
     try {
       const node = parseUri(link.trim());
-      if (node) yaml += generateClashNode(node) + "\n";
+      if (node) yaml += generateClashNode(node) + '\n';
     } catch (e) {
-      console.warn("Parse failed:", link, e);
+      console.warn('Parse failed:', link, e);
     }
   }
-  return yaml.trim() || "# 无有效节点";
+  return yaml.trim() || '# 无有效节点';
 }
 
 // ====================== 反向：Clash → 链接 ======================
 export function clashToLink(yaml: string): string {
   const nodes = parseClashYaml(yaml);
-  return nodes.map(generateUri).filter(Boolean).join("\n");
+  return nodes.map(generateUri).filter(Boolean).join('\n');
 }
 
 // ====================== clash-verge-rev 核心（完整 uri-parser）======================
@@ -1143,72 +1143,83 @@ function URI_SOCKS(line: string): IProxySocks5Config {
   return proxy;
 }
 
-// ====================== Clash YAML 解析 ======================
-function parseClashYaml(yaml: string): IProxyConfig[] {
-  const lines = yaml.split("\n");
-  const nodes: IProxyConfig[] = [];
+// ====================== Clash YAML 简易解析（仅用于反向）=====================
+function parseClashYaml(yaml: string): any[] {
+  const lines = yaml.split('\n');
+  const nodes: any[] = [];
   let current: any = null;
   for (let line of lines) {
     line = line.trim();
-    if (line.startsWith("- name:")) {
+    if (line.startsWith('- name:')) {
       if (current) nodes.push(current);
-      current = { name: line.slice(8).replace(/^"(.*)"$/, "$1") };
-    } else if (current && line.includes(":")) {
-      const [k, ...v] = line.split(":");
+      current = { name: line.slice(8).replace(/^"(.*)"$/, '$1') };
+    } else if (current && line.includes(':')) {
+      const [k, ...v] = line.split(':');
       const key = k.trim();
-      const val = v
-        .join(":")
-        .trim()
-        .replace(/^"(.*)"$/, "$1");
-      current[key] = isNaN(+val)
-        ? val === "true"
-          ? true
-          : val === "false"
-          ? false
-          : val
-        : +val;
+      const val = v.join(':').trim().replace(/^"(.*)"$/, '$1');
+      if (key === 'reality-opts') continue; // 跳过嵌套，由后续处理
+      current[key] = isNaN(+val) ? (val === 'true' ? true : val === 'false' ? false : val) : +val;
+      // 处理嵌套 reality-opts
+      if (key === 'public-key') current.reality = current.reality || {}, current.reality['public-key'] = val;
+      if (key === 'short-id') current.reality = current.reality || {}, current.reality['short-id'] = val;
     }
   }
   if (current) nodes.push(current);
-  return nodes.filter((n) => n.type && n.server && n.port);
+  return nodes.filter(n => n.type && n.server && n.port);
 }
 
-// ====================== 生成 Clash 节点 ======================
-function generateClashNode(node: IProxyConfig): string {
+// ====================== 生成 Clash 节点（修复 VLESS Reality 重复）=====================
+function generateClashNode(node: any): string {
   const lines: string[] = [
     `  - name: "${node.name}"`,
     `    type: ${node.type}`,
     `    server: ${node.server}`,
     `    port: ${node.port}`,
   ];
+
+  // 通用字段
   if (node.uuid) lines.push(`    uuid: ${node.uuid}`);
   if (node.password) lines.push(`    password: ${node.password}`);
   if (node.cipher) lines.push(`    cipher: ${node.cipher}`);
   if (node.network) lines.push(`    network: ${node.network}`);
-  if (node.tls) lines.push("    tls: true");
-  if (node["skip-cert-verify"]) lines.push("    skip-cert-verify: true");
-  if (node.sni || node.servername)
-    lines.push(`    servername: "${node.sni || node.servername}"`);
-  if (node.fingerprint)
-    lines.push(`    client-fingerprint: ${node.fingerprint}`);
-  if (node["ws-opts"]) {
-    lines.push("    ws-opts:");
-    if (node["ws-opts"].path) lines.push(`      path: ${node["ws-opts"].path}`);
-    if (node["ws-opts"].headers?.Host)
-      lines.push(
-        `      headers:\n        Host: ${node["ws-opts"].headers.Host}`
-      );
+  if (node.tls) lines.push('    tls: true');
+  if (node.udp !== false) lines.push('    udp: true');
+  if (node['skip-cert-verify']) lines.push('    skip-cert-verify: true');
+  if (node.servername || node.sni) lines.push(`    servername: "${node.servername || node.sni}"`);
+  if (node.fingerprint || node['client-fingerprint']) {
+    lines.push(`    client-fingerprint: ${node.fingerprint || node['client-fingerprint']}`);
   }
-  if (node.reality) {
-    lines.push("    reality-opts:");
-    lines.push(`      public-key: "${node.reality["public-key"]}"`);
-    if (node.reality["short-id"])
-      lines.push(`      short-id: "${node.reality["short-id"]}"`);
+
+  // WS/GRPC/H2
+  if (node['ws-opts']) {
+    lines.push('    ws-opts:');
+    if (node['ws-opts'].path) lines.push(`      path: "${node['ws-opts'].path}"`);
+    if (node['ws-opts'].headers?.Host) lines.push(`      headers:\n        Host: "${node['ws-opts'].headers.Host}"`);
   }
-  return lines.join("\n");
+  if (node['grpc-opts']?.['grpc-service-name']) {
+    lines.push('    grpc-opts:');
+    lines.push(`      grpc-service-name: "${node['grpc-opts']['grpc-service-name']}"`);
+  }
+
+  // Reality
+  if (node.reality || node['reality-opts']) {
+    const reality = node.reality || node['reality-opts'];
+    lines.push('    reality-opts:');
+    lines.push(`      public-key: "${reality['public-key'] || reality.publicKey || ''}"`);
+    lines.push(`      short-id: "${reality['short-id'] || reality.shortId || ''}"`); // 强制保留
+  }
+
+  // Hysteria2
+  if (node.type === 'hysteria2') {
+    if (node.alpn) lines.push(`    alpn:\n      - ${node.alpn.join('\n      - ')}`);
+    if (node.obfs) lines.push(`    obfs: ${node.obfs}`);
+    if (node['obfs-password']) lines.push(`    obfs-password: ${node['obfs-password']}`);
+  }
+
+  return lines.join('\n');
 }
 
-// ====================== 生成原始链接 ======================
+// ====================== 生成原始链接（完整支持所有协议）=====================
 export function generateUri(node: any): string {
   const name = encodeURIComponent(node.name || 'Node');
   const server = node.server;
@@ -1216,26 +1227,10 @@ export function generateUri(node: any): string {
 
   switch (node.type) {
     case 'ss':
-      const ssCipher = node.cipher === 'none' ? 'auto' : node.cipher;
-      const ssPass = encodeURIComponent(node.password);
-      const ssPart = `${ssCipher}:${ssPass}@${server}:${port}`;
-      return `ss://${btoa(ssPart)}#${name}`;
-
-    case 'ssr':
-      const ssrItems = [
-        server, port, node.protocol || 'origin',
-        node.cipher || 'aes-256-cfb',
-        btoa(node.password),
-        btoa(node['protocol-param'] || ''),
-        btoa(node['obfs-param'] || ''),
-        btoa(node['obfs'] || 'plain')
-      ];
-      const ssrBase = ssrItems.join(':');
-      const ssrParams = new URLSearchParams();
-      if (node.name) ssrParams.set('remarks', btoa(node.name));
-      if (node['protocol-param']) ssrParams.set('protoparam', btoa(node['protocol-param']));
-      if (node['obfs-param']) ssrParams.set('obfsparam', btoa(node['obfs-param']));
-      return `ssr://${btoa(ssrBase)}/?${ssrParams.toString()}#${name}`;
+      const cipher = node.cipher || 'auto';
+      const pass = encodeURIComponent(node.password || '');
+      const auth = btoa(`${cipher}:${pass}`);
+      return `ss://${auth}@${server}:${port}#${name}`;
 
     case 'vmess':
       const vmess: any = {
@@ -1248,84 +1243,59 @@ export function generateUri(node: any): string {
         scy: node.cipher || 'auto',
         net: node.network || 'tcp',
         type: 'none',
-        host: '',
-        path: '',
+        host: node['ws-opts']?.headers?.Host || '',
+        path: node['ws-opts']?.path || node['grpc-opts']?.['grpc-service-name'] || '',
         tls: node.tls ? 'tls' : 'none',
         sni: node.servername || '',
-        alpn: node.alpn?.join(',') || ''
+        alpn: node.alpn?.join(',') || '',
+        fp: node.fingerprint || node['client-fingerprint'] || '',
       };
-      if (node.network === 'ws') {
-        vmess.host = node['ws-opts']?.headers?.Host || '';
-        vmess.path = node['ws-opts']?.path || '';
-      }
-      if (node.network === 'grpc') {
-        vmess.net = 'grpc';
-        vmess.path = node['grpc-opts']?.['grpc-service-name'] || '';
-      }
       return `vmess://${btoa(JSON.stringify(vmess))}#${name}`;
 
     case 'vless':
-      let vless = `vless://${node.uuid}@${server}:${port}`;
-      const vlessParams = new URLSearchParams();
-      vlessParams.set('type', node.network || 'tcp');
-      vlessParams.set('security', node.reality ? 'reality' : node.tls ? 'tls' : 'none');
-      if (node.flow) vlessParams.set('flow', node.flow);
-      if (node.sni || node.servername) vlessParams.set('sni', node.sni || node.servername);
-      if (node.fingerprint) vlessParams.set('fp', node.fingerprint);
-      if (node.reality) {
-        vlessParams.set('pbk', node.reality['public-key']);
-        if (node.reality['short-id']) vlessParams.set('sid', node.reality['short-id']);
+      let link = `vless://${node.uuid}@${server}:${port}`;
+      const params = new URLSearchParams();
+      params.set('type', node.network || 'tcp');
+      params.set('encryption', 'none');
+      if (node.flow) params.set('flow', node.flow);
+      if (node.tls || node.reality) {
+        params.set('security', node.reality ? 'reality' : 'tls');
+        if (node.servername || node.sni) params.set('sni', node.servername || node.sni);
+        if (node.fingerprint || node['client-fingerprint']) params.set('fp', node.fingerprint || node['client-fingerprint']);
+        if (node['skip-cert-verify']) params.set('allowInsecure', '1');
+        if (node.reality) {
+          params.set('pbk', node.reality['public-key']);
+          params.set('sid', node.reality['short-id'] || '');
+        }
       }
-      if (node['skip-cert-verify']) vlessParams.set('allowInsecure', '1');
-      return vless + '?' + vlessParams.toString() + `#${name}`;
+      return link + '?' + params.toString() + `#${name}`;
 
     case 'trojan':
-      let trojan = `trojan://${encodeURIComponent(node.password)}@${server}:${port}`;
-      const trojanParams = new URLSearchParams();
-      if (node.network === 'ws') {
-        trojanParams.set('type', 'ws');
-        if (node['ws-opts']?.path) trojanParams.set('path', node['ws-opts'].path);
-        if (node['ws-opts']?.headers?.Host) trojanParams.set('host', node['ws-opts'].headers.Host);
-      }
-      if (node.sni) trojanParams.set('sni', node.sni);
-      if (node['skip-cert-verify']) trojanParams.set('skip-cert-verify', '1');
-      if (node.fingerprint) trojanParams.set('fp', node.fingerprint);
-      return trojan + (trojanParams.toString() ? '?' + trojanParams.toString() : '') + `#${name}`;
+      let trojan = `trojan://${encodeURIComponent(node.password || '')}@${server}:${port}`;
+      const tParams = new URLSearchParams();
+      if (node.network && node.network !== 'tcp') tParams.set('type', node.network);
+      if (node.sni || node.servername) tParams.set('sni', node.sni || node.servername);
+      if (node['skip-cert-verify']) tParams.set('allowInsecure', '1');
+      if (node.fingerprint) tParams.set('fp', node.fingerprint);
+      return trojan + (tParams.toString() ? '?' + tParams.toString() : '') + `#${name}`;
 
     case 'hysteria2':
-      let hy2 = `hysteria2://${encodeURIComponent(node.password)}@${server}:${port}`;
-      const hy2Params = new URLSearchParams();
-      if (node.sni) hy2Params.set('sni', node.sni);
-      if (node.obfs) hy2Params.set('obfs', node.obfs);
-      if (node['obfs-password']) hy2Params.set('obfs-password', node['obfs-password']);
-      if (node['skip-cert-verify']) hy2Params.set('insecure', '1');
-      return hy2 + (hy2Params.toString() ? '?' + hy2Params.toString() : '') + `#${name}`;
+      let hy2 = `hysteria2://${encodeURIComponent(node.password || '')}@${server}:${port}`;
+      const hyParams = new URLSearchParams();
+      if (node.sni) hyParams.set('sni', node.sni);
+      if (node.obfs) hyParams.set('obfs', node.obfs);
+      if (node['obfs-password']) hyParams.set('obfs-password', node['obfs-password']);
+      if (node['skip-cert-verify']) hyParams.set('insecure', '1');
+      if (node.alpn) hyParams.set('alpn', node.alpn.join(','));
+      return hy2 + (hyParams.toString() ? '?' + hyParams.toString() : '') + `#${name}`;
 
     case 'tuic':
-      let tuic = `tuic://${node.uuid}:${encodeURIComponent(node.password)}@${server}:${port}`;
+      let tuic = `tuic://${node.uuid}:${encodeURIComponent(node.password || '')}@${server}:${port}`;
       const tuicParams = new URLSearchParams();
       if (node.sni) tuicParams.set('sni', node.sni);
-      if (node['skip-cert-verify']) tuicParams.set('allow_insecure', '1');
       if (node.alpn) tuicParams.set('alpn', node.alpn.join(','));
+      if (node['skip-cert-verify']) tuicParams.set('allow_insecure', '1');
       return tuic + (tuicParams.toString() ? '?' + tuicParams.toString() : '') + `#${name}`;
-
-    case 'wireguard':
-      let wg = `wireguard://${node['private-key']}@${server}:${port}`;
-      const wgParams = new URLSearchParams();
-      if (node.ip) wgParams.set('ip', node.ip);
-      if (node['public-key']) wgParams.set('publickey', node['public-key']);
-      if (node['pre-shared-key']) wgParams.set('pre-shared-key', node['pre-shared-key']);
-      return wg + (wgParams.toString() ? '?' + wgParams.toString() : '') + `#${name}`;
-
-    case 'http':
-    case 'socks5':
-      const auth = node.username ? `${encodeURIComponent(node.username)}:${encodeURIComponent(node.password)}@` : '';
-      const proto = node.type === 'http' ? 'http' : 'socks5';
-      let proxy = `${proto}://${auth}${server}:${port}`;
-      const pParams = new URLSearchParams();
-      if (node.tls) pParams.set('tls', 'true');
-      if (node['skip-cert-verify']) pParams.set('skip-cert-verify', '1');
-      return proxy + (pParams.toString() ? '?' + pParams.toString() : '') + `#${name}`;
 
     default:
       return '';
