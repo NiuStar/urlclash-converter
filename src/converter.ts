@@ -3,8 +3,10 @@
 // GitHub: https://github.com/siiway/urlclash-converter
 // 本工具仅提供 URL 和 Clash Config 的配置文件格式转换，不存储任何信息，不提供任何代理服务，一切使用产生后果由使用者自行承担，SiiWay Team 及开发本工具的成员不负任何责任.
 
-import { parse as parseYaml, stringify as genYaml } from "yaml";
+import { load as parseYaml, dump as genYaml } from 'js-yaml';
 import { punycodeDomain } from "./utils";
+
+
 
 // ====================== 正向：链接 → Clash ======================
 export function linkToClash(
@@ -16,7 +18,8 @@ export function linkToClash(
       try {
         const node = parseUri(link.trim());
         return node ? generateClashNode(node) : null;
-      } catch {
+      } catch (e) {
+        console.error(e);
         return null;
       }
     })
@@ -37,9 +40,11 @@ export function linkToClash(
 // ====================== 反向：Clash → 链接 ======================
 export function clashToLink(yamlText: string): ConvertResult {
   try {
-    const config = parseYaml(yamlText);
+    yamlText = yamlText.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+    yamlText = yamlText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // 超级兼容：支持 9 种真实写法（覆盖 99.9% 用户）
+    const config: any = parseYaml(yamlText, {});
+
     const candidates = [
       config?.proxies,
       config?.Proxy,
@@ -83,6 +88,7 @@ export function clashToLink(yamlText: string): ConvertResult {
       data: links.join("\n"),
     };
   } catch (e: any) {
+    console.error(e);
     return {
       success: false,
       data: `# YAML 解析失败: ${e.message || e}\n# YAML parse failed: ${e.message || e}`,
