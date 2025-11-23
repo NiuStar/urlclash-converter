@@ -23,7 +23,7 @@ export function linkToClash(
     .filter(Boolean);
 
   if (nodeStrings.length === 0) {
-    return { success: false, data: "# 无有效节点（请检查链接格式是否正确）" };
+    return { success: false, data: "# 无有效节点 (请检查链接格式是否正确)\n# No vaild node (please check link format)" };
   }
 
   const content = nodeStrings.join("\n");
@@ -72,7 +72,7 @@ export function clashToLink(yamlText: string): ConvertResult {
     if (proxies.length === 0) {
       return {
         success: false,
-        data: "# 未检测到任何节点（支持: proxies / payload / 节点数组）",
+        data: "# 未检测到任何节点 (支持: proxies / payload / 节点数组)\n# No vaild node found (Support: proxies / payload / nodes array)",
       };
     }
 
@@ -85,7 +85,7 @@ export function clashToLink(yamlText: string): ConvertResult {
   } catch (e: any) {
     return {
       success: false,
-      data: `# YAML 解析失败：${e.message || e}`,
+      data: `# YAML 解析失败: ${e.message || e}\n# YAML parse failed: ${e.message || e}`,
     };
   }
 }

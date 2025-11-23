@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -122,29 +123,45 @@ function AppContent({ isDark, toggleTheme }: { isDark: boolean; toggleTheme: () 
   const [linksInput, setLinksInput] = useState('');
   const [outputMode, setOutputMode] = useState('proxies');
 
+  const [copyLeftText, setCopyLeftText] = useState(t('copy'));
+  const [pasteLeftText, setPasteLeftText] = useState(t('paste'));
+  const [copyRightText, setCopyRightText] = useState(t('copy'));
+  const [pasteRightText, setPasteRightText] = useState(t('paste'));
+
   useEffect(() => {
     document.title = t('title');
   }, [t]);
+
+  useEffect(() => {
+    // Update button texts when language changes
+    setCopyLeftText(t('copy'));
+    setPasteLeftText(t('paste'));
+    setCopyRightText(t('copy'));
+    setPasteRightText(t('paste'));
+  }, [i18n.language, t]);  // Depend on language and t
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
   };
 
-  const handlePaste = async (setter: (val: string) => void) => {
+  const handleCopy = async (text: string, buttonSetter: (text: string) => void, originalText: string) => {
     try {
-      const text = await navigator.clipboard.readText();
-      setter(text);
+      await navigator.clipboard.writeText(text);
+      buttonSetter(t('copied'));
+      setTimeout(() => buttonSetter(t('copy')), 800);  // Use t('copy') directly in timeout
     } catch (err) {
-      console.error('Failed to read clipboard', err);
+      alert(t('copy-failed'));
     }
   };
 
-  const handleCopy = async (text: string) => {
+  const handlePaste = async (setter: (val: string) => void, buttonSetter: (text: string) => void, originalText: string) => {
     try {
-      await navigator.clipboard.writeText(text);
-      // Could add a toast notification here
+      const text = await navigator.clipboard.readText();
+      setter(text);
+      buttonSetter(t('pasted'));
+      setTimeout(() => buttonSetter(t('paste')), 800);  // Use t('paste') directly in timeout
     } catch (err) {
-      console.error('Failed to write clipboard', err);
+      alert(t('paste-failed')); 
     }
   };
 
@@ -169,11 +186,9 @@ function AppContent({ isDark, toggleTheme }: { isDark: boolean; toggleTheme: () 
         <div className={styles.headerContent}>
           <div className={styles.headerTitleArea}>
             <Title1>{t('title')}</Title1>
-            <div style={{ marginTop: '8px', opacity: 0.9 }}>
-              <Text>{t('subtitle')}</Text>
-            </div>
+            <Text>{t('subtitle')}</Text>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div>
             <Button
               appearance="subtle"
               icon={<LocalLanguageRegular />}
@@ -198,8 +213,19 @@ function AppContent({ isDark, toggleTheme }: { isDark: boolean; toggleTheme: () 
           <div className={styles.columnHeader}>
             <Title3>{t('clashConfig')}</Title3>
             <div className={styles.controls}>
-              <Button icon={<ClipboardPasteRegular />} onClick={() => handlePaste(setClashInput)}>{t('paste')}</Button>
-              <Button icon={<CopyRegular />} appearance="primary" onClick={() => handleCopy(clashInput)}>{t('copy')}</Button>
+              <Button
+                icon={<ClipboardPasteRegular />}
+                onClick={() => handlePaste(setClashInput, setPasteLeftText, t('paste'))}
+              >
+                {pasteLeftText}
+              </Button>
+              <Button
+                icon={<CopyRegular />}
+                appearance="primary"
+                onClick={() => handleCopy(clashInput, setCopyLeftText, t('copy'))}
+              >
+                {copyLeftText}
+              </Button>
             </div>
           </div>
           <Textarea
@@ -214,7 +240,7 @@ function AppContent({ isDark, toggleTheme }: { isDark: boolean; toggleTheme: () 
             appearance="primary"
             size="large"
             icon={<ArrowRightRegular />}
-            iconPosition='after'
+            iconPosition="after"
             onClick={convertToLinks}
           >
             {t('clashToLink')}
@@ -229,8 +255,19 @@ function AppContent({ isDark, toggleTheme }: { isDark: boolean; toggleTheme: () 
               <Text size={200} style={{ opacity: 0.7 }}>{t('onePerLine')}</Text>
             </div>
             <div className={styles.controls}>
-              <Button icon={<ClipboardPasteRegular />} onClick={() => handlePaste(setLinksInput)}>{t('paste')}</Button>
-              <Button icon={<CopyRegular />} appearance="primary" onClick={() => handleCopy(linksInput)}>{t('copy')}</Button>
+              <Button
+                icon={<ClipboardPasteRegular />}
+                onClick={() => handlePaste(setLinksInput, setPasteRightText, t('paste'))}
+              >
+                {pasteRightText}
+              </Button>
+              <Button
+                icon={<CopyRegular />}
+                appearance="primary"
+                onClick={() => handleCopy(linksInput, setCopyRightText, t('copy'))}
+              >
+                {copyRightText}
+              </Button>
             </div>
           </div>
           <Textarea
