@@ -87,7 +87,7 @@ Code powered by Grok + Gemini, under GPL-3.0 License.
 ## Ref
 
 - Clash Verge `uri-parser.ts` *([`src/converter.ts`](./src/converter.ts) 参考)*: https://github.com/clash-verge-rev/clash-verge-rev/blob/44adf5597546ae2b3c7e3e25418c419760eba7a3/src/utils/uri-parser.ts
-- Clash Verge `tyoes.d.ts` *([`src/types/types.d.ts`](./src/types/types.d.ts) 参考)*: https://github.com/clash-verge-rev/clash-verge-rev/blob/44adf5597546ae2b3c7e3e25418c419760eba7a3/src/types/types.d.ts#L341-L777
+- Clash Verge `types.d.ts` *([`src/types/types.d.ts`](./src/types/types.d.ts) 参考)*: https://github.com/clash-verge-rev/clash-verge-rev/blob/44adf5597546ae2b3c7e3e25418c419760eba7a3/src/types/types.d.ts#L341-L777
 - Clash Meta (Mihomo) 配置文件示例: https://github.com/MetaCubeX/mihomo/blob/140d892ccf309280d08bb0a487c7f5a6d663c5c5/docs/config.yaml#L348-L1064
 - Vless 分享链接提案: https://github.com/XTLS/Xray-core/discussions/716
 - Hysteria2 URL Scheme: https://v2.hysteria.network/zh/docs/developers/URI-Scheme/

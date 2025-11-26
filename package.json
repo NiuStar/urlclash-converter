@@ -21,7 +21,6 @@
     },
     "devDependencies": {
         "@modyfi/vite-plugin-yaml": "^1.1.1",
-        "@types/js-yaml": "^4.0.9",
         "@types/react": "^19.2.6",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.1",
@@ -33,10 +32,10 @@
         "@fluentui/react-icons": "^2.0.315",
         "i18next": "^25.6.3",
         "i18next-browser-languagedetector": "^8.2.0",
-        "js-yaml": "^4.1.1",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
         "react-i18next": "^16.3.5",
-        "ts-punycode": "^0.1.0"
+        "ts-punycode": "^0.1.0",
+        "yaml": "^2.8.1"
     }
 }
