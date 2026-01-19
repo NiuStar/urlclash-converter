@@ -5,48 +5,54 @@ on:
     branches: [main]
   workflow_dispatch:
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 使用 pnpm 官方 action
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
-          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: pnpm
 
-      # 安装依赖
       - name: Install dependencies
-        run: |
-          pnpm i --frozen-lockfile
+        run: pnpm i --frozen-lockfile
 
-      # 构建 React 应用
       - name: Build
-        run: |
-          pnpm build
+        run: pnpm run build
 
-      # 上传到 GitHub Pages
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: ./dist
 
-      # 部署
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
