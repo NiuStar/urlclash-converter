@@ -7,3 +7,7 @@ export default defineConfig({
   plugins: [react(), ViteYaml()],
   base: "./",
 });
+
+export default {
+  base: "/urlclash-converter/",
+}
